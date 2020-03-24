@@ -21,6 +21,7 @@ import android.os.SystemClock;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlayerLibraryInfo;
+import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.drm.DrmSession;
 import com.google.android.exoplayer2.drm.DrmSessionManager;
@@ -53,6 +54,7 @@ import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /** A SmoothStreaming {@link MediaSource}. */
@@ -69,13 +71,12 @@ public final class SsMediaSource extends BaseMediaSource
     private final SsChunkSource.Factory chunkSourceFactory;
     @Nullable private final DataSource.Factory manifestDataSourceFactory;
 
-    @Nullable private ParsingLoadable.Parser<? extends SsManifest> manifestParser;
-    @Nullable private List<StreamKey> streamKeys;
     private CompositeSequenceableLoaderFactory compositeSequenceableLoaderFactory;
-    private DrmSessionManager<?> drmSessionManager;
+    private DrmSessionManager drmSessionManager;
     private LoadErrorHandlingPolicy loadErrorHandlingPolicy;
     private long livePresentationDelayMs;
-    private boolean isCreateCalled;
+    @Nullable private ParsingLoadable.Parser<? extends SsManifest> manifestParser;
+    private List<StreamKey> streamKeys;
     @Nullable private Object tag;
 
     /**
@@ -106,49 +107,20 @@ public final class SsMediaSource extends BaseMediaSource
       loadErrorHandlingPolicy = new DefaultLoadErrorHandlingPolicy();
       livePresentationDelayMs = DEFAULT_LIVE_PRESENTATION_DELAY_MS;
       compositeSequenceableLoaderFactory = new DefaultCompositeSequenceableLoaderFactory();
+      streamKeys = Collections.emptyList();
     }
 
     /**
-     * Sets a tag for the media source which will be published in the {@link Timeline} of the source
-     * as {@link Timeline.Window#tag}.
-     *
-     * @param tag A tag for the media source.
-     * @return This factory, for convenience.
-     * @throws IllegalStateException If one of the {@code create} methods has already been called.
+     * @deprecated Use {@link MediaItem.Builder#setTag(Object)} and {@link
+     *     #createMediaSource(MediaItem)} instead.
      */
+    @Deprecated
     public Factory setTag(@Nullable Object tag) {
-      Assertions.checkState(!isCreateCalled);
       this.tag = tag;
       return this;
     }
 
-    /**
-     * Sets the {@link DrmSessionManager} to use for acquiring {@link DrmSession DrmSessions}. The
-     * default value is {@link DrmSessionManager#DUMMY}.
-     *
-     * @param drmSessionManager The {@link DrmSessionManager}.
-     * @return This factory, for convenience.
-     * @throws IllegalStateException If one of the {@code create} methods has already been called.
-     */
-    public Factory setDrmSessionManager(DrmSessionManager<?> drmSessionManager) {
-      Assertions.checkState(!isCreateCalled);
-      this.drmSessionManager = drmSessionManager;
-      return this;
-    }
-
-    /**
-     * Sets the minimum number of times to retry if a loading error occurs. See {@link
-     * #setLoadErrorHandlingPolicy} for the default value.
-     *
-     * <p>Calling this method is equivalent to calling {@link #setLoadErrorHandlingPolicy} with
-     * {@link DefaultLoadErrorHandlingPolicy#DefaultLoadErrorHandlingPolicy(int)
-     * DefaultLoadErrorHandlingPolicy(minLoadableRetryCount)}
-     *
-     * @param minLoadableRetryCount The minimum number of times to retry if a loading error occurs.
-     * @return This factory, for convenience.
-     * @throws IllegalStateException If one of the {@code create} methods has already been called.
-     * @deprecated Use {@link #setLoadErrorHandlingPolicy(LoadErrorHandlingPolicy)} instead.
-     */
+    /** @deprecated Use {@link #setLoadErrorHandlingPolicy(LoadErrorHandlingPolicy)} instead. */
     @Deprecated
     public Factory setMinLoadableRetryCount(int minLoadableRetryCount) {
       return setLoadErrorHandlingPolicy(new DefaultLoadErrorHandlingPolicy(minLoadableRetryCount));
@@ -162,11 +134,13 @@ public final class SsMediaSource extends BaseMediaSource
      *
      * @param loadErrorHandlingPolicy A {@link LoadErrorHandlingPolicy}.
      * @return This factory, for convenience.
-     * @throws IllegalStateException If one of the {@code create} methods has already been called.
      */
-    public Factory setLoadErrorHandlingPolicy(LoadErrorHandlingPolicy loadErrorHandlingPolicy) {
-      Assertions.checkState(!isCreateCalled);
-      this.loadErrorHandlingPolicy = loadErrorHandlingPolicy;
+    public Factory setLoadErrorHandlingPolicy(
+        @Nullable LoadErrorHandlingPolicy loadErrorHandlingPolicy) {
+      this.loadErrorHandlingPolicy =
+          loadErrorHandlingPolicy != null
+              ? loadErrorHandlingPolicy
+              : new DefaultLoadErrorHandlingPolicy();
       return this;
     }
 
@@ -178,10 +152,8 @@ public final class SsMediaSource extends BaseMediaSource
      * @param livePresentationDelayMs For live playbacks, the duration in milliseconds by which the
      *     default start position should precede the end of the live window.
      * @return This factory, for convenience.
-     * @throws IllegalStateException If one of the {@code create} methods has already been called.
      */
     public Factory setLivePresentationDelayMs(long livePresentationDelayMs) {
-      Assertions.checkState(!isCreateCalled);
       this.livePresentationDelayMs = livePresentationDelayMs;
       return this;
     }
@@ -191,11 +163,10 @@ public final class SsMediaSource extends BaseMediaSource
      *
      * @param manifestParser A parser for loaded manifest data.
      * @return This factory, for convenience.
-     * @throws IllegalStateException If one of the {@code create} methods has already been called.
      */
-    public Factory setManifestParser(ParsingLoadable.Parser<? extends SsManifest> manifestParser) {
-      Assertions.checkState(!isCreateCalled);
-      this.manifestParser = Assertions.checkNotNull(manifestParser);
+    public Factory setManifestParser(
+        @Nullable ParsingLoadable.Parser<? extends SsManifest> manifestParser) {
+      this.manifestParser = manifestParser;
       return this;
     }
 
@@ -208,14 +179,53 @@ public final class SsMediaSource extends BaseMediaSource
      *     SequenceableLoader}s for when this media source loads data from multiple streams (video,
      *     audio etc.).
      * @return This factory, for convenience.
-     * @throws IllegalStateException If one of the {@code create} methods has already been called.
      */
     public Factory setCompositeSequenceableLoaderFactory(
-        CompositeSequenceableLoaderFactory compositeSequenceableLoaderFactory) {
-      Assertions.checkState(!isCreateCalled);
+        @Nullable CompositeSequenceableLoaderFactory compositeSequenceableLoaderFactory) {
       this.compositeSequenceableLoaderFactory =
-          Assertions.checkNotNull(compositeSequenceableLoaderFactory);
+          compositeSequenceableLoaderFactory != null
+              ? compositeSequenceableLoaderFactory
+              : new DefaultCompositeSequenceableLoaderFactory();
       return this;
+    }
+
+    /**
+     * Sets the {@link DrmSessionManager} to use for acquiring {@link DrmSession DrmSessions}. The
+     * default value is {@link DrmSessionManager#DUMMY}.
+     *
+     * @param drmSessionManager The {@link DrmSessionManager}.
+     * @return This factory, for convenience.
+     */
+    @Override
+    public Factory setDrmSessionManager(@Nullable DrmSessionManager drmSessionManager) {
+      this.drmSessionManager =
+          drmSessionManager != null
+              ? drmSessionManager
+              : DrmSessionManager.getDummyDrmSessionManager();
+      return this;
+    }
+
+    /**
+     * @deprecated Use {@link MediaItem.Builder#setStreamKeys(List)} and {@link
+     *     #createMediaSource(MediaItem)} instead.
+     */
+    @SuppressWarnings("deprecation")
+    @Deprecated
+    @Override
+    public Factory setStreamKeys(@Nullable List<StreamKey> streamKeys) {
+      this.streamKeys = streamKeys != null ? streamKeys : Collections.emptyList();
+      return this;
+    }
+
+    /**
+     * Returns a new {@link SsMediaSource} using the current parameters.
+     *
+     * @param uri The {@link Uri uri}.
+     * @return The new {@link SsMediaSource}.
+     */
+    @Override
+    public SsMediaSource createMediaSource(Uri uri) {
+      return createMediaSource(new MediaItem.Builder().setSourceUri(uri).build());
     }
 
     /**
@@ -228,8 +238,7 @@ public final class SsMediaSource extends BaseMediaSource
      */
     public SsMediaSource createMediaSource(SsManifest manifest) {
       Assertions.checkArgument(!manifest.isLive);
-      isCreateCalled = true;
-      if (streamKeys != null && !streamKeys.isEmpty()) {
+      if (!streamKeys.isEmpty()) {
         manifest = manifest.copy(streamKeys);
       }
       return new SsMediaSource(
@@ -280,21 +289,27 @@ public final class SsMediaSource extends BaseMediaSource
     /**
      * Returns a new {@link SsMediaSource} using the current parameters.
      *
-     * @param manifestUri The manifest {@link Uri}.
+     * @param mediaItem The {@link MediaItem}.
      * @return The new {@link SsMediaSource}.
+     * @throws NullPointerException if {@link MediaItem#playbackProperties} is {@code null}.
      */
     @Override
-    public SsMediaSource createMediaSource(Uri manifestUri) {
-      isCreateCalled = true;
+    public SsMediaSource createMediaSource(MediaItem mediaItem) {
+      Assertions.checkNotNull(mediaItem.playbackProperties);
+      @Nullable ParsingLoadable.Parser<? extends SsManifest> manifestParser = this.manifestParser;
       if (manifestParser == null) {
         manifestParser = new SsManifestParser();
       }
-      if (streamKeys != null) {
+      List<StreamKey> streamKeys =
+          !mediaItem.playbackProperties.streamKeys.isEmpty()
+              ? mediaItem.playbackProperties.streamKeys
+              : this.streamKeys;
+      if (!streamKeys.isEmpty()) {
         manifestParser = new FilteringManifestParser<>(manifestParser, streamKeys);
       }
       return new SsMediaSource(
           /* manifest= */ null,
-          Assertions.checkNotNull(manifestUri),
+          mediaItem.playbackProperties.sourceUri,
           manifestDataSourceFactory,
           manifestParser,
           chunkSourceFactory,
@@ -302,21 +317,13 @@ public final class SsMediaSource extends BaseMediaSource
           drmSessionManager,
           loadErrorHandlingPolicy,
           livePresentationDelayMs,
-          tag);
-    }
-
-    @Override
-    public Factory setStreamKeys(List<StreamKey> streamKeys) {
-      Assertions.checkState(!isCreateCalled);
-      this.streamKeys = streamKeys;
-      return this;
+          mediaItem.playbackProperties.tag != null ? mediaItem.playbackProperties.tag : tag);
     }
 
     @Override
     public int[] getSupportedTypes() {
       return new int[] {C.TYPE_SS};
     }
-
   }
 
   /**
@@ -339,7 +346,7 @@ public final class SsMediaSource extends BaseMediaSource
   private final DataSource.Factory manifestDataSourceFactory;
   private final SsChunkSource.Factory chunkSourceFactory;
   private final CompositeSequenceableLoaderFactory compositeSequenceableLoaderFactory;
-  private final DrmSessionManager<?> drmSessionManager;
+  private final DrmSessionManager drmSessionManager;
   private final LoadErrorHandlingPolicy loadErrorHandlingPolicy;
   private final long livePresentationDelayMs;
   private final EventDispatcher manifestEventDispatcher;
@@ -522,7 +529,7 @@ public final class SsMediaSource extends BaseMediaSource
       @Nullable ParsingLoadable.Parser<? extends SsManifest> manifestParser,
       SsChunkSource.Factory chunkSourceFactory,
       CompositeSequenceableLoaderFactory compositeSequenceableLoaderFactory,
-      DrmSessionManager<?> drmSessionManager,
+      DrmSessionManager drmSessionManager,
       LoadErrorHandlingPolicy loadErrorHandlingPolicy,
       long livePresentationDelayMs,
       @Nullable Object tag) {

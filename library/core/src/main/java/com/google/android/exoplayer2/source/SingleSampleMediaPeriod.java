@@ -104,7 +104,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   }
 
   @Override
-  public void maybeThrowPrepareError() throws IOException {
+  public void maybeThrowPrepareError() {
     // Do nothing.
   }
 
@@ -383,8 +383,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
     @Nullable private byte[] sampleData;
 
-    // the constructor does not initialize fields: sampleData
-    @SuppressWarnings("nullness:initialization.fields.uninitialized")
     public SourceLoadable(DataSpec dataSpec, DataSource dataSource) {
       this.dataSpec = dataSpec;
       this.dataSource = new StatsDataSource(dataSource);
@@ -396,7 +394,7 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     }
 
     @Override
-    public void load() throws IOException, InterruptedException {
+    public void load() throws IOException {
       // We always load from the beginning, so reset bytesRead to 0.
       dataSource.resetBytesRead();
       try {
@@ -417,7 +415,5 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
         Util.closeQuietly(dataSource);
       }
     }
-
   }
-
 }

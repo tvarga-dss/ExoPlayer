@@ -110,7 +110,6 @@ public final class CastPlayer extends BasePlayer {
   private int pendingSeekCount;
   private int pendingSeekWindowIndex;
   private long pendingSeekPositionMs;
-  private boolean waitingForInitialTimeline;
 
   /**
    * @param castContext The context from which the cast session is obtained.
@@ -173,7 +172,6 @@ public final class CastPlayer extends BasePlayer {
       MediaQueueItem[] items, int startIndex, long positionMs, @RepeatMode int repeatMode) {
     if (remoteMediaClient != null) {
       positionMs = positionMs != C.TIME_UNSET ? positionMs : 0;
-      waitingForInitialTimeline = true;
       return remoteMediaClient.queueLoad(items, startIndex, getCastRepeatMode(repeatMode),
           positionMs, null);
     }
@@ -339,9 +337,16 @@ public final class CastPlayer extends BasePlayer {
     return Player.PLAYBACK_SUPPRESSION_REASON_NONE;
   }
 
+  @Deprecated
   @Override
   @Nullable
   public ExoPlaybackException getPlaybackError() {
+    return getPlayerError();
+  }
+
+  @Override
+  @Nullable
+  public ExoPlaybackException getPlayerError() {
     return null;
   }
 
@@ -353,7 +358,8 @@ public final class CastPlayer extends BasePlayer {
     // We update the local state and send the message to the receiver app, which will cause the
     // operation to be perceived as synchronous by the user. When the operation reports a result,
     // the local state will be updated to reflect the state reported by the Cast SDK.
-    setPlayerStateAndNotifyIfChanged(playWhenReady, playbackState);
+    setPlayerStateAndNotifyIfChanged(
+        playWhenReady, PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST, playbackState);
     flushNotifications();
     PendingResult<MediaChannelResult> pendingResult =
         playWhenReady ? remoteMediaClient.play() : remoteMediaClient.pause();
@@ -400,14 +406,30 @@ public final class CastPlayer extends BasePlayer {
     flushNotifications();
   }
 
+  /** @deprecated Use {@link #setPlaybackSpeed(float)} instead. */
+  @SuppressWarnings("deprecation")
+  @Deprecated
   @Override
   public void setPlaybackParameters(@Nullable PlaybackParameters playbackParameters) {
     // Unsupported by the RemoteMediaClient API. Do nothing.
   }
 
+  /** @deprecated Use {@link #getPlaybackSpeed()} instead. */
+  @SuppressWarnings("deprecation")
+  @Deprecated
   @Override
   public PlaybackParameters getPlaybackParameters() {
     return PlaybackParameters.DEFAULT;
+  }
+
+  @Override
+  public void setPlaybackSpeed(float playbackSpeed) {
+    // Unsupported by the RemoteMediaClient API. Do nothing.
+  }
+
+  @Override
+  public float getPlaybackSpeed() {
+    return Player.DEFAULT_PLAYBACK_SPEED;
   }
 
   @Override
@@ -627,8 +649,14 @@ public final class CastPlayer extends BasePlayer {
       newPlayWhenReadyValue = !remoteMediaClient.isPaused();
       playWhenReady.clearPendingResultCallback();
     }
+    @PlayWhenReadyChangeReason
+    int playWhenReadyChangeReason =
+        newPlayWhenReadyValue != playWhenReady.value
+            ? PLAY_WHEN_READY_CHANGE_REASON_REMOTE
+            : PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST;
     // We do not mask the playback state, so try setting it regardless of the playWhenReady masking.
-    setPlayerStateAndNotifyIfChanged(newPlayWhenReadyValue, fetchPlaybackState(remoteMediaClient));
+    setPlayerStateAndNotifyIfChanged(
+        newPlayWhenReadyValue, playWhenReadyChangeReason, fetchPlaybackState(remoteMediaClient));
   }
 
   @RequiresNonNull("remoteMediaClient")
@@ -641,15 +669,13 @@ public final class CastPlayer extends BasePlayer {
 
   private void updateTimelineAndNotifyIfChanged() {
     if (updateTimeline()) {
-      @Player.TimelineChangeReason
-      int reason =
-          waitingForInitialTimeline
-              ? Player.TIMELINE_CHANGE_REASON_PREPARED
-              : Player.TIMELINE_CHANGE_REASON_DYNAMIC;
-      waitingForInitialTimeline = false;
+      // TODO: Differentiate TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED and
+      //     TIMELINE_CHANGE_REASON_SOURCE_UPDATE [see internal: b/65152553].
       notificationsBatch.add(
           new ListenerNotificationTask(
-              listener -> listener.onTimelineChanged(currentTimeline, reason)));
+              listener ->
+                  listener.onTimelineChanged(
+                      currentTimeline, Player.TIMELINE_CHANGE_REASON_SOURCE_UPDATE)));
     }
   }
 
@@ -721,14 +747,27 @@ public final class CastPlayer extends BasePlayer {
     }
   }
 
+  @SuppressWarnings("deprecation")
   private void setPlayerStateAndNotifyIfChanged(
-      boolean playWhenReady, @Player.State int playbackState) {
-    if (this.playWhenReady.value != playWhenReady || this.playbackState != playbackState) {
-      this.playWhenReady.value = playWhenReady;
+      boolean playWhenReady,
+      @Player.PlayWhenReadyChangeReason int playWhenReadyChangeReason,
+      @Player.State int playbackState) {
+    boolean playWhenReadyChanged = this.playWhenReady.value != playWhenReady;
+    boolean playbackStateChanged = this.playbackState != playbackState;
+    if (playWhenReadyChanged || playbackStateChanged) {
       this.playbackState = playbackState;
+      this.playWhenReady.value = playWhenReady;
       notificationsBatch.add(
           new ListenerNotificationTask(
-              listener -> listener.onPlayerStateChanged(playWhenReady, playbackState)));
+              listener -> {
+                listener.onPlayerStateChanged(playWhenReady, playbackState);
+                if (playbackStateChanged) {
+                  listener.onPlaybackStateChanged(playbackState);
+                }
+                if (playWhenReadyChanged) {
+                  listener.onPlayWhenReadyChanged(playWhenReady, playWhenReadyChangeReason);
+                }
+              }));
     }
   }
 
