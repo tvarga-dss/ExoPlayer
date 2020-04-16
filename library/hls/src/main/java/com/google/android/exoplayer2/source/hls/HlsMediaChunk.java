@@ -96,8 +96,8 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     DataSpec dataSpec =
         new DataSpec(
             UriUtil.resolveToUri(mediaPlaylist.baseUri, mediaSegment.url),
-            mediaSegment.byterangeOffset,
-            mediaSegment.byterangeLength);
+            mediaSegment.byteRangeOffset,
+            mediaSegment.byteRangeLength);
     boolean mediaSegmentEncrypted = mediaSegmentKey != null;
     @Nullable
     byte[] mediaSegmentIv =
@@ -120,7 +120,7 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
               : null;
       Uri initSegmentUri = UriUtil.resolveToUri(mediaPlaylist.baseUri, initSegment.url);
       initDataSpec =
-          new DataSpec(initSegmentUri, initSegment.byterangeOffset, initSegment.byterangeLength);
+          new DataSpec(initSegmentUri, initSegment.byteRangeOffset, initSegment.byteRangeLength);
       initDataSource = buildDataSource(dataSource, initSegmentKey, initSegmentIv);
     }
 
@@ -196,6 +196,9 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   /** The url of the playlist from which this chunk was obtained. */
   public final Uri playlistUrl;
 
+  /** Whether the samples parsed from this chunk should be spliced into already queued samples. */
+  public final boolean shouldSpliceIn;
+
   @Nullable private final DataSource initDataSource;
   @Nullable private final DataSpec initDataSpec;
   @Nullable private final Extractor previousExtractor;
@@ -203,7 +206,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   private final boolean isMasterTimestampSource;
   private final boolean hasGapTag;
   private final TimestampAdjuster timestampAdjuster;
-  private final boolean shouldSpliceIn;
   private final HlsExtractorFactory extractorFactory;
   @Nullable private final List<Format> muxedCaptionFormats;
   @Nullable private final DrmInitData drmInitData;
@@ -290,7 +292,6 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
    */
   public void init(HlsSampleStreamWrapper output) {
     this.output = output;
-    output.init(uid, shouldSpliceIn);
   }
 
   @Override
@@ -544,5 +545,4 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
     }
     return dataSource;
   }
-
 }
