@@ -572,8 +572,8 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
   }
 
   @Override
-  public void onLoadCanceled(
-      ExtractingLoadable loadable, long elapsedRealtimeMs, long loadDurationMs, boolean released) {
+  public void onLoadCanceled(ExtractingLoadable loadable, long elapsedRealtimeMs,
+      long loadDurationMs, boolean released, boolean interrupted) {
     eventDispatcher.loadCanceled(
         loadable.dataSpec,
         loadable.dataSource.getLastOpenedUri(),
@@ -956,6 +956,11 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
     @Override
     public void cancelLoad() {
       loadCanceled = true;
+    }
+
+    @Override
+    public boolean isLoadCanceled() {
+      return loadCanceled;
     }
 
     @Override

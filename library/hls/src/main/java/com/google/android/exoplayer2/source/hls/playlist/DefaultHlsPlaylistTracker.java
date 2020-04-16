@@ -256,7 +256,8 @@ public final class DefaultHlsPlaylistTracker
       ParsingLoadable<HlsPlaylist> loadable,
       long elapsedRealtimeMs,
       long loadDurationMs,
-      boolean released) {
+      boolean released,
+      boolean interrupted) {
     eventDispatcher.loadCanceled(
         loadable.dataSpec,
         loadable.getUri(),
@@ -538,7 +539,8 @@ public final class DefaultHlsPlaylistTracker
         ParsingLoadable<HlsPlaylist> loadable,
         long elapsedRealtimeMs,
         long loadDurationMs,
-        boolean released) {
+        boolean released,
+        boolean interrupted) {
       eventDispatcher.loadCanceled(
           loadable.dataSpec,
           loadable.getUri(),

@@ -761,7 +761,8 @@ public class SampleQueue implements TrackOutput {
 
   private long discardUpstreamSampleMetadata(int discardFromIndex) {
     int discardCount = getWriteIndex() - discardFromIndex;
-    Assertions.checkArgument(0 <= discardCount && discardCount <= (length - readPosition));
+    Assertions.checkArgument(0 <= discardCount);
+    discardCount = getMaximumDiscardCount(discardCount);
     length -= discardCount;
     largestQueuedTimestampUs = Math.max(largestDiscardedTimestampUs, getLargestTimestamp(length));
     isLastSampleQueued = discardCount == 0 && isLastSampleQueued;
@@ -770,6 +771,13 @@ public class SampleQueue implements TrackOutput {
       return offsets[relativeLastWriteIndex] + sizes[relativeLastWriteIndex];
     }
     return 0;
+  }
+
+  private int getMaximumDiscardCount(int discardCount) {
+    if (discardCount > (length - readPosition)) {
+      discardCount = length - readPosition;
+    }
+    return discardCount;
   }
 
   private boolean hasNextSample() {
