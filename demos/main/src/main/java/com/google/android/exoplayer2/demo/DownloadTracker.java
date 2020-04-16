@@ -19,10 +19,12 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.net.Uri;
 import android.widget.Toast;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.FragmentManager;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.RenderersFactory;
+import com.google.android.exoplayer2.demo.Sample.UriSample;
 import com.google.android.exoplayer2.offline.Download;
 import com.google.android.exoplayer2.offline.DownloadCursor;
 import com.google.android.exoplayer2.offline.DownloadHelper;
@@ -91,12 +93,8 @@ public class DownloadTracker {
   }
 
   public void toggleDownload(
-      FragmentManager fragmentManager,
-      String name,
-      Uri uri,
-      String extension,
-      RenderersFactory renderersFactory) {
-    Download download = downloads.get(uri);
+      FragmentManager fragmentManager, UriSample sample, RenderersFactory renderersFactory) {
+    Download download = downloads.get(sample.uri);
     if (download != null) {
       DownloadService.sendRemoveDownload(
           context, DemoDownloadService.class, download.request.id, /* foreground= */ false);
@@ -106,7 +104,9 @@ public class DownloadTracker {
       }
       startDownloadDialogHelper =
           new StartDownloadDialogHelper(
-              fragmentManager, getDownloadHelper(uri, extension, renderersFactory), name);
+              fragmentManager,
+              getDownloadHelper(sample.uri, sample.extension, renderersFactory),
+              sample);
     }
   }
 
@@ -141,7 +141,8 @@ public class DownloadTracker {
   private class DownloadManagerListener implements DownloadManager.Listener {
 
     @Override
-    public void onDownloadChanged(DownloadManager downloadManager, Download download) {
+    public void onDownloadChanged(
+        @NonNull DownloadManager downloadManager, @NonNull Download download) {
       downloads.put(download.request.uri, download);
       for (Listener listener : listeners) {
         listener.onDownloadsChanged();
@@ -149,7 +150,8 @@ public class DownloadTracker {
     }
 
     @Override
-    public void onDownloadRemoved(DownloadManager downloadManager, Download download) {
+    public void onDownloadRemoved(
+        @NonNull DownloadManager downloadManager, @NonNull Download download) {
       downloads.remove(download.request.uri);
       for (Listener listener : listeners) {
         listener.onDownloadsChanged();
@@ -164,16 +166,16 @@ public class DownloadTracker {
 
     private final FragmentManager fragmentManager;
     private final DownloadHelper downloadHelper;
-    private final String name;
+    private final UriSample sample;
 
     private TrackSelectionDialog trackSelectionDialog;
     private MappedTrackInfo mappedTrackInfo;
 
     public StartDownloadDialogHelper(
-        FragmentManager fragmentManager, DownloadHelper downloadHelper, String name) {
+        FragmentManager fragmentManager, DownloadHelper downloadHelper, UriSample sample) {
       this.fragmentManager = fragmentManager;
       this.downloadHelper = downloadHelper;
-      this.name = name;
+      this.sample = sample;
       downloadHelper.prepare(this);
     }
 
@@ -187,7 +189,7 @@ public class DownloadTracker {
     // DownloadHelper.Callback implementation.
 
     @Override
-    public void onPrepared(DownloadHelper helper) {
+    public void onPrepared(@NonNull DownloadHelper helper) {
       if (helper.getPeriodCount() == 0) {
         Log.d(TAG, "No periods found. Downloading entire stream.");
         startDownload();
@@ -214,7 +216,7 @@ public class DownloadTracker {
     }
 
     @Override
-    public void onPrepareError(DownloadHelper helper, IOException e) {
+    public void onPrepareError(@NonNull DownloadHelper helper, @NonNull IOException e) {
       Toast.makeText(context, R.string.download_start_error, Toast.LENGTH_LONG).show();
       Log.e(
           TAG,
@@ -268,7 +270,7 @@ public class DownloadTracker {
     }
 
     private DownloadRequest buildDownloadRequest() {
-      return downloadHelper.getDownloadRequest(Util.getUtf8Bytes(name));
+      return downloadHelper.getDownloadRequest(Util.getUtf8Bytes(sample.name));
     }
   }
 }
