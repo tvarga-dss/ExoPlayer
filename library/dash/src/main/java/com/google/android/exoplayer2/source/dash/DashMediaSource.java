@@ -1357,7 +1357,8 @@ public final class DashMediaSource extends BaseMediaSource {
         ParsingLoadable<DashManifest> loadable,
         long elapsedRealtimeMs,
         long loadDurationMs,
-        boolean released) {
+        boolean released,
+        boolean interrupted) {
       DashMediaSource.this.onLoadCanceled(loadable, elapsedRealtimeMs, loadDurationMs);
     }
 
@@ -1386,7 +1387,8 @@ public final class DashMediaSource extends BaseMediaSource {
         ParsingLoadable<Long> loadable,
         long elapsedRealtimeMs,
         long loadDurationMs,
-        boolean released) {
+        boolean released,
+        boolean interrupted) {
       DashMediaSource.this.onLoadCanceled(loadable, elapsedRealtimeMs, loadDurationMs);
     }
 

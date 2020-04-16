@@ -110,6 +110,11 @@ public class ContainerMediaChunk extends BaseMediaChunk {
     loadCanceled = true;
   }
 
+  @Override
+  public boolean isLoadCanceled() {
+    return loadCanceled;
+  }
+
   @SuppressWarnings("NonAtomicVolatileUpdate")
   @Override
   public final void load() throws IOException {

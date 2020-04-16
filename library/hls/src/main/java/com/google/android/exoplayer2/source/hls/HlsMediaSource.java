@@ -86,6 +86,9 @@ public final class HlsMediaSource extends BaseMediaSource
   /** Type for ESMG metadata in HLS streams. */
   public static final int METADATA_TYPE_EMSG = 3;
 
+  /** Delegate for keeping track of the hls interrupt state */
+  @Nullable private final HlsInterruptStateDelegate hlsInterruptStateDelegate;
+
   /** Factory for {@link HlsMediaSource}s. */
   public static final class Factory implements MediaSourceFactory {
 
@@ -102,6 +105,7 @@ public final class HlsMediaSource extends BaseMediaSource
     private boolean useSessionKeys;
     private List<StreamKey> streamKeys;
     @Nullable private Object tag;
+    @Nullable private HlsInterruptStateDelegate hlsInterruptStateDelegate;
 
     /**
      * Creates a new factory for {@link HlsMediaSource}s.
@@ -366,12 +370,19 @@ public final class HlsMediaSource extends BaseMediaSource
           allowChunklessPreparation,
           metadataType,
           useSessionKeys,
-          mediaItem.playbackProperties.tag != null ? mediaItem.playbackProperties.tag : tag);
+          mediaItem.playbackProperties.tag != null ? mediaItem.playbackProperties.tag : tag,
+          hlsInterruptStateDelegate);
     }
 
     @Override
     public int[] getSupportedTypes() {
       return new int[] {C.TYPE_HLS};
+    }
+
+    public Factory setHlsInterruptStateDelegate(HlsInterruptStateDelegate hlsInterruptStateDelegate) {
+      Assertions.checkNotNull(hlsInterruptStateDelegate);
+      this.hlsInterruptStateDelegate = hlsInterruptStateDelegate;
+      return this;
     }
   }
 
@@ -400,7 +411,8 @@ public final class HlsMediaSource extends BaseMediaSource
       boolean allowChunklessPreparation,
       @MetadataType int metadataType,
       boolean useSessionKeys,
-      @Nullable Object tag) {
+      @Nullable Object tag,
+      @Nullable HlsInterruptStateDelegate hlsInterruptStateDelegate) {
     this.manifestUri = manifestUri;
     this.dataSourceFactory = dataSourceFactory;
     this.extractorFactory = extractorFactory;
@@ -412,6 +424,7 @@ public final class HlsMediaSource extends BaseMediaSource
     this.metadataType = metadataType;
     this.useSessionKeys = useSessionKeys;
     this.tag = tag;
+    this.hlsInterruptStateDelegate = hlsInterruptStateDelegate;
   }
 
   @Override
@@ -448,7 +461,8 @@ public final class HlsMediaSource extends BaseMediaSource
         compositeSequenceableLoaderFactory,
         allowChunklessPreparation,
         metadataType,
-        useSessionKeys);
+        useSessionKeys,
+        hlsInterruptStateDelegate);
   }
 
   @Override
