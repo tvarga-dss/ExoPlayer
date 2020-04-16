@@ -255,6 +255,11 @@ public final class SntpClient {
     public void cancelLoad() {}
 
     @Override
+    public boolean isLoadCanceled() {
+      return false;
+    }
+
+    @Override
     public void load() throws IOException {
       // Synchronized to prevent redundant parallel requests.
       synchronized (loaderLock) {
@@ -290,7 +295,7 @@ public final class SntpClient {
 
     @Override
     public void onLoadCanceled(
-        Loadable loadable, long elapsedRealtimeMs, long loadDurationMs, boolean released) {
+        Loadable loadable, long elapsedRealtimeMs, long loadDurationMs, boolean released, boolean interrupted) {
       // Ignore.
     }
 

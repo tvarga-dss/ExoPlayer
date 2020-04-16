@@ -167,6 +167,11 @@ public final class ParsingLoadable<T> implements Loadable {
   }
 
   @Override
+  public boolean isLoadCanceled() {
+    return false;
+  }
+
+  @Override
   public final void load() throws IOException {
     // We always load from the beginning, so reset bytesRead to 0.
     dataSource.resetBytesRead();

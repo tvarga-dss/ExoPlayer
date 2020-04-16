@@ -93,7 +93,8 @@ public final class HlsMediaPeriodTest {
               mock(CompositeSequenceableLoaderFactory.class),
               /* allowChunklessPreparation =*/ true,
               HlsMediaSource.METADATA_TYPE_ID3,
-              /* useSessionKeys= */ false);
+              /* useSessionKeys= */ false,
+              /* hlsInterruptStateDelegate= */null);
         };
 
     MediaPeriodAsserts.assertGetStreamKeysAndManifestFilterIntegration(

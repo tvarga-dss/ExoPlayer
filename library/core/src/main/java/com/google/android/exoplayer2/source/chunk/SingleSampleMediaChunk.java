@@ -89,6 +89,11 @@ public final class SingleSampleMediaChunk extends BaseMediaChunk {
     // Do nothing.
   }
 
+  @Override
+  public boolean isLoadCanceled() {
+    return false;
+  }
+
   @SuppressWarnings("NonAtomicVolatileUpdate")
   @Override
   public void load() throws IOException {

@@ -60,6 +60,11 @@ public final class Loader implements LoaderErrorThrower {
     void cancelLoad();
 
     /**
+     * @return true if the load has been cancelled
+     */
+    boolean isLoadCanceled();
+
+    /**
      * Performs the load, returning on completion or cancellation.
      *
      * @throws IOException If the input could not be loaded.
@@ -99,8 +104,9 @@ public final class Loader implements LoaderErrorThrower {
      *     was called up to the point at which it was canceled.
      * @param released True if the load was canceled because the {@link Loader} was released. False
      *     otherwise.
+     * @param interrupted true if the load was interrupted
      */
-    void onLoadCanceled(T loadable, long elapsedRealtimeMs, long loadDurationMs, boolean released);
+    void onLoadCanceled(T loadable, long elapsedRealtimeMs, long loadDurationMs, boolean released, boolean interrupted);
 
     /**
      * Called when a load encounters an error.
@@ -261,6 +267,17 @@ public final class Loader implements LoaderErrorThrower {
     Assertions.checkStateNotNull(currentTask).cancel(false);
   }
 
+  /**
+   * Interrupt the current load later discarding samples too.
+   *
+   * @throws IllegalStateException If the loader is not currently loading.
+   */
+  public void interruptLoading() {
+    Assertions.checkStateNotNull(currentTask);
+    currentTask.interrupted = true;
+    currentTask.cancel(false);
+  }
+
   /** Releases the loader. This method should be called when the loader is no longer required. */
   public void release() {
     release(null);
@@ -316,6 +333,7 @@ public final class Loader implements LoaderErrorThrower {
 
     private final T loadable;
     private final long startTimeMs;
+    private boolean interrupted;
 
     @Nullable private Loader.Callback<T> callback;
     @Nullable private IOException currentError;
@@ -370,7 +388,7 @@ public final class Loader implements LoaderErrorThrower {
         finish();
         long nowMs = SystemClock.elapsedRealtime();
         Assertions.checkNotNull(callback)
-            .onLoadCanceled(loadable, nowMs, nowMs - startTimeMs, true);
+            .onLoadCanceled(loadable, nowMs, nowMs - startTimeMs, true, false);
         // If loading, this task will be referenced from a GC root (the loading thread) until
         // cancellation completes. The time taken for cancellation to complete depends on the
         // implementation of the Loadable that the task is loading. We null the callback reference
@@ -441,12 +459,12 @@ public final class Loader implements LoaderErrorThrower {
       long durationMs = nowMs - startTimeMs;
       Loader.Callback<T> callback = Assertions.checkNotNull(this.callback);
       if (canceled) {
-        callback.onLoadCanceled(loadable, nowMs, durationMs, false);
+        callback.onLoadCanceled(loadable, nowMs, durationMs, false, interrupted);
         return;
       }
       switch (msg.what) {
         case MSG_CANCEL:
-          callback.onLoadCanceled(loadable, nowMs, durationMs, false);
+          callback.onLoadCanceled(loadable, nowMs, durationMs, false, false);
           break;
         case MSG_END_OF_SOURCE:
           try {

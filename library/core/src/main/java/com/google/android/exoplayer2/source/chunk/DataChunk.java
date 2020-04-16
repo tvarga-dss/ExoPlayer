@@ -77,6 +77,11 @@ public abstract class DataChunk extends Chunk {
   }
 
   @Override
+  public boolean isLoadCanceled() {
+    return loadCanceled;
+  }
+
+  @Override
   public final void load() throws IOException {
     try {
       dataSource.open(dataSpec);

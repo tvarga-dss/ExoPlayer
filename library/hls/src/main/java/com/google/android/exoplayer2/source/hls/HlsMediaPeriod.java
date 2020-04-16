@@ -77,6 +77,7 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsSampleStreamWrapper
   private final boolean allowChunklessPreparation;
   private final @HlsMediaSource.MetadataType int metadataType;
   private final boolean useSessionKeys;
+  @Nullable private final HlsInterruptStateDelegate hlsInterruptStateDelegate;
 
   @Nullable private Callback callback;
   private int pendingPrepareCount;
@@ -106,6 +107,7 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsSampleStreamWrapper
    *     SequenceableLoader}s for when this media source loads data from multiple streams.
    * @param allowChunklessPreparation Whether chunkless preparation is allowed.
    * @param useSessionKeys Whether to use #EXT-X-SESSION-KEY tags.
+   * @param hlsInterruptStateDelegate delegate for keeping track of the hls interrupt state
    */
   public HlsMediaPeriod(
       HlsExtractorFactory extractorFactory,
@@ -119,7 +121,8 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsSampleStreamWrapper
       CompositeSequenceableLoaderFactory compositeSequenceableLoaderFactory,
       boolean allowChunklessPreparation,
       @HlsMediaSource.MetadataType int metadataType,
-      boolean useSessionKeys) {
+      boolean useSessionKeys,
+      @Nullable HlsInterruptStateDelegate hlsInterruptStateDelegate) {
     this.extractorFactory = extractorFactory;
     this.playlistTracker = playlistTracker;
     this.dataSourceFactory = dataSourceFactory;
@@ -132,6 +135,7 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsSampleStreamWrapper
     this.allowChunklessPreparation = allowChunklessPreparation;
     this.metadataType = metadataType;
     this.useSessionKeys = useSessionKeys;
+    this.hlsInterruptStateDelegate = hlsInterruptStateDelegate;
     compositeSequenceableLoader =
         compositeSequenceableLoaderFactory.createCompositeSequenceableLoader();
     streamWrapperIndices = new IdentityHashMap<>();
@@ -759,7 +763,8 @@ public final class HlsMediaPeriod implements MediaPeriod, HlsSampleStreamWrapper
         drmSessionManager,
         loadErrorHandlingPolicy,
         eventDispatcher,
-        metadataType);
+        metadataType,
+        hlsInterruptStateDelegate);
   }
 
   private static Map<String, DrmInitData> deriveOverridingDrmInitData(
