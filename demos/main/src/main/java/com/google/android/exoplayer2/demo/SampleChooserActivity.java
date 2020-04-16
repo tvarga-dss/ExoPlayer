@@ -17,6 +17,8 @@ package com.google.android.exoplayer2.demo;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -34,6 +36,7 @@ import android.widget.ExpandableListView.OnChildClickListener;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.exoplayer2.ParserException;
@@ -62,26 +65,30 @@ public class SampleChooserActivity extends AppCompatActivity
     implements DownloadTracker.Listener, OnChildClickListener {
 
   private static final String TAG = "SampleChooserActivity";
+  private static final String GROUP_POSITION_PREFERENCE_KEY = "SAMPLE_CHOOSER_GROUP_POSITION";
+  private static final String CHILD_POSITION_PREFERENCE_KEY = "SAMPLE_CHOOSER_CHILD_POSITION";
 
+  private String[] uris;
   private boolean useExtensionRenderers;
   private DownloadTracker downloadTracker;
   private SampleAdapter sampleAdapter;
   private MenuItem preferExtensionDecodersMenuItem;
   private MenuItem randomAbrMenuItem;
   private MenuItem tunnelingMenuItem;
+  private ExpandableListView sampleListView;
 
   @Override
   public void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.sample_chooser_activity);
     sampleAdapter = new SampleAdapter();
-    ExpandableListView sampleListView = findViewById(R.id.sample_list);
+    sampleListView = findViewById(R.id.sample_list);
+
     sampleListView.setAdapter(sampleAdapter);
     sampleListView.setOnChildClickListener(this);
 
     Intent intent = getIntent();
     String dataUri = intent.getDataString();
-    String[] uris;
     if (dataUri != null) {
       uris = new String[] {dataUri};
     } else {
@@ -105,8 +112,7 @@ public class SampleChooserActivity extends AppCompatActivity
     DemoApplication application = (DemoApplication) getApplication();
     useExtensionRenderers = application.useExtensionRenderers();
     downloadTracker = application.getDownloadTracker();
-    SampleListLoader loaderTask = new SampleListLoader();
-    loaderTask.execute(uris);
+    loadSample();
 
     // Start the download service if it should be running but it's not currently.
     // Starting the service in the foreground causes notification flicker if there is no scheduled
@@ -157,17 +163,70 @@ public class SampleChooserActivity extends AppCompatActivity
     sampleAdapter.notifyDataSetChanged();
   }
 
+  @Override
+  public void onRequestPermissionsResult(
+      int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    if (grantResults.length == 0) {
+      // Empty results are triggered if a permission is requested while another request was already
+      // pending and can be safely ignored in this case.
+      return;
+    }
+    if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+      loadSample();
+    } else {
+      Toast.makeText(getApplicationContext(), R.string.sample_list_load_error, Toast.LENGTH_LONG)
+          .show();
+      finish();
+    }
+  }
+
+  private void loadSample() {
+    Assertions.checkNotNull(uris);
+
+    for (int i = 0; i < uris.length; i++) {
+      Uri uri = Uri.parse(uris[i]);
+      if (Util.maybeRequestReadExternalStoragePermission(this, uri)) {
+        return;
+      }
+    }
+
+    SampleListLoader loaderTask = new SampleListLoader();
+    loaderTask.execute(uris);
+  }
+
   private void onSampleGroups(final List<SampleGroup> groups, boolean sawError) {
     if (sawError) {
       Toast.makeText(getApplicationContext(), R.string.sample_list_load_error, Toast.LENGTH_LONG)
           .show();
     }
     sampleAdapter.setSampleGroups(groups);
+
+    SharedPreferences preferences = getPreferences(MODE_PRIVATE);
+
+    int groupPosition = -1;
+    int childPosition = -1;
+    try {
+      groupPosition = preferences.getInt(GROUP_POSITION_PREFERENCE_KEY, /* defValue= */ -1);
+      childPosition = preferences.getInt(CHILD_POSITION_PREFERENCE_KEY, /* defValue= */ -1);
+    } catch (ClassCastException e) {
+      Log.w(TAG, "Saved position is not an int. Will not restore position.", e);
+    }
+    if (groupPosition != -1 && childPosition != -1) {
+      sampleListView.expandGroup(groupPosition); // shouldExpandGroup does not work without this.
+      sampleListView.setSelectedChild(groupPosition, childPosition, /* shouldExpandGroup= */ true);
+    }
   }
 
   @Override
   public boolean onChildClick(
       ExpandableListView parent, View view, int groupPosition, int childPosition, long id) {
+    // Save the selected item first to be able to restore it if the tested code crashes.
+    SharedPreferences.Editor prefEditor = getPreferences(MODE_PRIVATE).edit();
+    prefEditor.putInt(GROUP_POSITION_PREFERENCE_KEY, groupPosition);
+    prefEditor.putInt(CHILD_POSITION_PREFERENCE_KEY, childPosition);
+    prefEditor.apply();
+
     Sample sample = (Sample) view.getTag();
     Intent intent = new Intent(this, PlayerActivity.class);
     intent.putExtra(
@@ -190,16 +249,11 @@ public class SampleChooserActivity extends AppCompatActivity
       Toast.makeText(getApplicationContext(), downloadUnsupportedStringId, Toast.LENGTH_LONG)
           .show();
     } else {
-      UriSample uriSample = (UriSample) sample;
       RenderersFactory renderersFactory =
           ((DemoApplication) getApplication())
               .buildRenderersFactory(isNonNullAndChecked(preferExtensionDecodersMenuItem));
       downloadTracker.toggleDownload(
-          getSupportFragmentManager(),
-          sample.name,
-          uriSample.uri,
-          uriSample.extension,
-          renderersFactory);
+          getSupportFragmentManager(), (UriSample) sample, renderersFactory);
     }
   }
 
@@ -307,6 +361,7 @@ public class SampleChooserActivity extends AppCompatActivity
       String drmScheme = null;
       String drmLicenseUrl = null;
       String[] drmKeyRequestProperties = null;
+      String[] drmSessionForClearTypes = null;
       boolean drmMultiSession = false;
       ArrayList<UriSample> playlistSamples = null;
       String adTagUri = null;
@@ -347,6 +402,15 @@ public class SampleChooserActivity extends AppCompatActivity
             }
             reader.endObject();
             drmKeyRequestProperties = drmKeyRequestPropertiesList.toArray(new String[0]);
+            break;
+          case "drm_session_for_clear_types":
+            ArrayList<String> drmSessionForClearTypesList = new ArrayList<>();
+            reader.beginArray();
+            while (reader.hasNext()) {
+              drmSessionForClearTypesList.add(reader.nextString());
+            }
+            reader.endArray();
+            drmSessionForClearTypes = drmSessionForClearTypesList.toArray(new String[0]);
             break;
           case "drm_multi_session":
             drmMultiSession = reader.nextBoolean();
@@ -389,6 +453,7 @@ public class SampleChooserActivity extends AppCompatActivity
                   Util.getDrmUuid(drmScheme),
                   drmLicenseUrl,
                   drmKeyRequestProperties,
+                  Sample.toTrackTypeArray(drmSessionForClearTypes),
                   drmMultiSession);
       Sample.SubtitleInfo subtitleInfo =
           subtitleUri == null
@@ -424,7 +489,6 @@ public class SampleChooserActivity extends AppCompatActivity
       groups.add(group);
       return group;
     }
-
   }
 
   private final class SampleAdapter extends BaseExpandableListAdapter implements OnClickListener {
@@ -451,8 +515,12 @@ public class SampleChooserActivity extends AppCompatActivity
     }
 
     @Override
-    public View getChildView(int groupPosition, int childPosition, boolean isLastChild,
-        View convertView, ViewGroup parent) {
+    public View getChildView(
+        int groupPosition,
+        int childPosition,
+        boolean isLastChild,
+        View convertView,
+        ViewGroup parent) {
       View view = convertView;
       if (view == null) {
         view = getLayoutInflater().inflate(R.layout.sample_list_item, parent, false);
@@ -480,8 +548,8 @@ public class SampleChooserActivity extends AppCompatActivity
     }
 
     @Override
-    public View getGroupView(int groupPosition, boolean isExpanded, View convertView,
-        ViewGroup parent) {
+    public View getGroupView(
+        int groupPosition, boolean isExpanded, View convertView, ViewGroup parent) {
       View view = convertView;
       if (view == null) {
         view =
@@ -537,6 +605,5 @@ public class SampleChooserActivity extends AppCompatActivity
       this.title = title;
       this.samples = new ArrayList<>();
     }
-
   }
 }
