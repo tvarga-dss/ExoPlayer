@@ -50,6 +50,11 @@ public final class FakeMediaChunk extends MediaChunk {
   }
 
   @Override
+  public boolean isLoadCanceled() {
+    return false;
+  }
+
+  @Override
   public void load() {
     // Do nothing.
   }

@@ -328,6 +328,11 @@ import org.checkerframework.checker.nullness.qual.RequiresNonNull;
   }
 
   @Override
+  public boolean isLoadCanceled() {
+    return loadCanceled;
+  }
+
+  @Override
   public void load() throws IOException {
     // output == null means init() hasn't been called.
     Assertions.checkNotNull(output);

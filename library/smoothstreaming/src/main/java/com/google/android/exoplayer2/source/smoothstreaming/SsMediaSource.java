@@ -639,7 +639,8 @@ public final class SsMediaSource extends BaseMediaSource
       ParsingLoadable<SsManifest> loadable,
       long elapsedRealtimeMs,
       long loadDurationMs,
-      boolean released) {
+      boolean released,
+      boolean interrupted) {
     manifestEventDispatcher.loadCanceled(
         loadable.dataSpec,
         loadable.getUri(),
