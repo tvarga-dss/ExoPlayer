@@ -13,16 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.android.exoplayer2.demo;
+package com.google.android.exoplayer2.demo2;
 
 import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
 import static com.google.android.exoplayer2.util.Assertions.checkState;
 
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Bundle;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.MediaItem;
+import com.google.android.exoplayer2.MediaMetadata;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Util;
 import com.google.common.collect.ImmutableList;
@@ -49,6 +51,7 @@ public class IntentUtil {
 
   public static final String URI_EXTRA = "uri";
   public static final String MIME_TYPE_EXTRA = "mime_type";
+  public static final String TITLE = "title";
   public static final String CLIP_START_POSITION_MS_EXTRA = "clip_start_position_ms";
   public static final String CLIP_END_POSITION_MS_EXTRA = "clip_end_position_ms";
 
@@ -82,14 +85,26 @@ public class IntentUtil {
     return mediaItems;
   }
 
-  /** Populates the intent with the given list of {@link MediaItem media items}. */
-  public static void addToIntent(List<MediaItem> mediaItems, Intent intent) {
+  /**
+   * Creates a list of {@link MediaItem media items} from a {@link Bundle}.
+   */
+  public static List<MediaItem> createMediaItemsFromBundle(Bundle bundle) {
+    List<MediaItem> mediaItems = new ArrayList<>();
+    Uri uri = bundle.getParcelable(URI_EXTRA);
+    mediaItems.add(createMediaItemFromBundle(uri, bundle, /* extrasKeySuffix= */ ""));
+    return mediaItems;
+  }
+
+  /**
+   * Populates the intent with the given list of {@link MediaItem media items}.
+   */
+  public static void addToIntent(List<MediaItem> mediaItems, Intent intent, String title) {
     Assertions.checkArgument(!mediaItems.isEmpty());
     if (mediaItems.size() == 1) {
       MediaItem mediaItem = mediaItems.get(0);
       MediaItem.PlaybackProperties playbackProperties = checkNotNull(mediaItem.playbackProperties);
       intent.setAction(ACTION_VIEW).setData(mediaItem.playbackProperties.uri);
-      addPlaybackPropertiesToIntent(playbackProperties, intent, /* extrasKeySuffix= */ "");
+      addPlaybackPropertiesToIntent(playbackProperties, intent, /* extrasKeySuffix= */ "", title);
       addClippingPropertiesToIntent(
           mediaItem.clippingProperties, intent, /* extrasKeySuffix= */ "");
     } else {
@@ -99,9 +114,36 @@ public class IntentUtil {
         MediaItem.PlaybackProperties playbackProperties =
             checkNotNull(mediaItem.playbackProperties);
         intent.putExtra(URI_EXTRA + ("_" + i), playbackProperties.uri.toString());
-        addPlaybackPropertiesToIntent(playbackProperties, intent, /* extrasKeySuffix= */ "_" + i);
+        addPlaybackPropertiesToIntent(playbackProperties, intent, /* extrasKeySuffix= */ "_" + i,
+            title);
         addClippingPropertiesToIntent(
             mediaItem.clippingProperties, intent, /* extrasKeySuffix= */ "_" + i);
+      }
+    }
+  }
+
+  /**
+   * Populates the bundle with the given list of {@link MediaItem media items}.
+   */
+  public static void addToBundle(List<MediaItem> mediaItems, Bundle bundle, String title) {
+    Assertions.checkArgument(!mediaItems.isEmpty());
+    if (mediaItems.size() == 1) {
+      MediaItem mediaItem = mediaItems.get(0);
+      MediaItem.PlaybackProperties playbackProperties = checkNotNull(mediaItem.playbackProperties);
+      bundle.putParcelable(URI_EXTRA, mediaItem.playbackProperties.uri);
+      addPlaybackPropertiesToBundle(playbackProperties, bundle, /* extrasKeySuffix= */ "", title);
+      addClippingPropertiesToBundle(
+          mediaItem.clippingProperties, bundle, /* extrasKeySuffix= */ "");
+    } else {
+      for (int i = 0; i < mediaItems.size(); i++) {
+        MediaItem mediaItem = mediaItems.get(i);
+        MediaItem.PlaybackProperties playbackProperties =
+            checkNotNull(mediaItem.playbackProperties);
+        bundle.putString(URI_EXTRA + ("_" + i), playbackProperties.uri.toString());
+        addPlaybackPropertiesToBundle(playbackProperties, bundle, /* extrasKeySuffix= */ "_" + i,
+            title);
+        addClippingPropertiesToBundle(
+            mediaItem.clippingProperties, bundle, /* extrasKeySuffix= */ "_" + i);
       }
     }
   }
@@ -109,8 +151,10 @@ public class IntentUtil {
   private static MediaItem createMediaItemFromIntent(
       Uri uri, Intent intent, String extrasKeySuffix) {
     @Nullable String mimeType = intent.getStringExtra(MIME_TYPE_EXTRA + extrasKeySuffix);
+    @Nullable String title = intent.getStringExtra(TITLE + extrasKeySuffix);
     MediaItem.Builder builder =
         new MediaItem.Builder()
+            .setMediaMetadata(new MediaMetadata.Builder().setTitle(title).build())
             .setUri(uri)
             .setMimeType(mimeType)
             .setAdTagUri(intent.getStringExtra(AD_TAG_URI_EXTRA + extrasKeySuffix))
@@ -124,6 +168,26 @@ public class IntentUtil {
     return populateDrmPropertiesFromIntent(builder, intent, extrasKeySuffix).build();
   }
 
+  private static MediaItem createMediaItemFromBundle(
+      Uri uri, Bundle bundle, String extrasKeySuffix) {
+    @Nullable String mimeType = bundle.getString(MIME_TYPE_EXTRA + extrasKeySuffix);
+    @Nullable String title = bundle.getString(TITLE + extrasKeySuffix);
+    MediaItem.Builder builder =
+        new MediaItem.Builder()
+            .setMediaMetadata(new MediaMetadata.Builder().setTitle(title).build())
+            .setUri(uri)
+            .setMimeType(mimeType)
+            .setAdTagUri(bundle.getString(AD_TAG_URI_EXTRA + extrasKeySuffix))
+            .setSubtitles(createSubtitlesFromBundle(bundle, extrasKeySuffix))
+            .setClipStartPositionMs(
+                bundle.getLong(CLIP_START_POSITION_MS_EXTRA + extrasKeySuffix, 0))
+            .setClipEndPositionMs(
+                bundle.getLong(
+                    CLIP_END_POSITION_MS_EXTRA + extrasKeySuffix, C.TIME_END_OF_SOURCE));
+
+    return populateDrmPropertiesFromBundle(builder, bundle, extrasKeySuffix).build();
+  }
+
   private static List<MediaItem.Subtitle> createSubtitlesFromIntent(
       Intent intent, String extrasKeySuffix) {
     if (!intent.hasExtra(SUBTITLE_URI_EXTRA + extrasKeySuffix)) {
@@ -134,6 +198,19 @@ public class IntentUtil {
             Uri.parse(intent.getStringExtra(SUBTITLE_URI_EXTRA + extrasKeySuffix)),
             checkNotNull(intent.getStringExtra(SUBTITLE_MIME_TYPE_EXTRA + extrasKeySuffix)),
             intent.getStringExtra(SUBTITLE_LANGUAGE_EXTRA + extrasKeySuffix),
+            C.SELECTION_FLAG_DEFAULT));
+  }
+
+  private static List<MediaItem.Subtitle> createSubtitlesFromBundle(
+      Bundle bundle, String extrasKeySuffix) {
+    if (bundle.getString(SUBTITLE_URI_EXTRA + extrasKeySuffix) == null) {
+      return Collections.emptyList();
+    }
+    return Collections.singletonList(
+        new MediaItem.Subtitle(
+            Uri.parse(bundle.getString(SUBTITLE_URI_EXTRA + extrasKeySuffix)),
+            checkNotNull(bundle.getString(SUBTITLE_MIME_TYPE_EXTRA + extrasKeySuffix)),
+            bundle.getString(SUBTITLE_LANGUAGE_EXTRA + extrasKeySuffix),
             C.SELECTION_FLAG_DEFAULT));
   }
 
@@ -167,10 +244,42 @@ public class IntentUtil {
     return builder;
   }
 
+  private static MediaItem.Builder populateDrmPropertiesFromBundle(
+      MediaItem.Builder builder, Bundle bundle, String extrasKeySuffix) {
+    String schemeKey = DRM_SCHEME_EXTRA + extrasKeySuffix;
+    @Nullable String drmSchemeExtra = bundle.getString(schemeKey);
+    if (drmSchemeExtra == null) {
+      return builder;
+    }
+    Map<String, String> headers = new HashMap<>();
+    @Nullable
+    String[] keyRequestPropertiesArray =
+        bundle.getStringArray(DRM_KEY_REQUEST_PROPERTIES_EXTRA + extrasKeySuffix);
+    if (keyRequestPropertiesArray != null) {
+      for (int i = 0; i < keyRequestPropertiesArray.length; i += 2) {
+        headers.put(keyRequestPropertiesArray[i], keyRequestPropertiesArray[i + 1]);
+      }
+    }
+    builder
+        .setDrmUuid(Util.getDrmUuid(Util.castNonNull(drmSchemeExtra)))
+        .setDrmLicenseUri(bundle.getString(DRM_LICENSE_URI_EXTRA + extrasKeySuffix))
+        .setDrmMultiSession(
+            bundle.getBoolean(DRM_MULTI_SESSION_EXTRA + extrasKeySuffix, false))
+        .setDrmForceDefaultLicenseUri(
+            bundle.getBoolean(DRM_FORCE_DEFAULT_LICENSE_URI_EXTRA + extrasKeySuffix, false))
+        .setDrmLicenseRequestHeaders(headers);
+    if (bundle.getBoolean(DRM_SESSION_FOR_CLEAR_CONTENT + extrasKeySuffix, false)) {
+      builder.setDrmSessionForClearTypes(ImmutableList.of(C.TRACK_TYPE_VIDEO, C.TRACK_TYPE_AUDIO));
+    }
+    return builder;
+  }
+
   private static void addPlaybackPropertiesToIntent(
-      MediaItem.PlaybackProperties playbackProperties, Intent intent, String extrasKeySuffix) {
+      MediaItem.PlaybackProperties playbackProperties, Intent intent, String extrasKeySuffix,
+      String title) {
     intent
         .putExtra(MIME_TYPE_EXTRA + extrasKeySuffix, playbackProperties.mimeType)
+        .putExtra(TITLE + extrasKeySuffix, title)
         .putExtra(
             AD_TAG_URI_EXTRA + extrasKeySuffix,
             playbackProperties.adsConfiguration != null
@@ -185,6 +294,29 @@ public class IntentUtil {
       intent.putExtra(SUBTITLE_URI_EXTRA + extrasKeySuffix, subtitle.uri.toString());
       intent.putExtra(SUBTITLE_MIME_TYPE_EXTRA + extrasKeySuffix, subtitle.mimeType);
       intent.putExtra(SUBTITLE_LANGUAGE_EXTRA + extrasKeySuffix, subtitle.language);
+    }
+  }
+
+  private static void addPlaybackPropertiesToBundle(
+      MediaItem.PlaybackProperties playbackProperties, Bundle bundle, String extrasKeySuffix,
+      String title) {
+    bundle
+        .putString(MIME_TYPE_EXTRA + extrasKeySuffix, playbackProperties.mimeType);
+    bundle.putString(TITLE + extrasKeySuffix, title);
+    bundle.putString(
+        AD_TAG_URI_EXTRA + extrasKeySuffix,
+        playbackProperties.adsConfiguration != null
+            ? playbackProperties.adsConfiguration.adTagUri.toString()
+            : null);
+    if (playbackProperties.drmConfiguration != null) {
+      addDrmConfigurationToBundle(playbackProperties.drmConfiguration, bundle, extrasKeySuffix);
+    }
+    if (!playbackProperties.subtitles.isEmpty()) {
+      checkState(playbackProperties.subtitles.size() == 1);
+      MediaItem.Subtitle subtitle = playbackProperties.subtitles.get(0);
+      bundle.putString(SUBTITLE_URI_EXTRA + extrasKeySuffix, subtitle.uri.toString());
+      bundle.putString(SUBTITLE_MIME_TYPE_EXTRA + extrasKeySuffix, subtitle.mimeType);
+      bundle.putString(SUBTITLE_LANGUAGE_EXTRA + extrasKeySuffix, subtitle.language);
     }
   }
 
@@ -218,6 +350,38 @@ public class IntentUtil {
     }
   }
 
+  private static void addDrmConfigurationToBundle(
+      MediaItem.DrmConfiguration drmConfiguration, Bundle bundle, String extrasKeySuffix) {
+    bundle.putString(DRM_SCHEME_EXTRA + extrasKeySuffix, drmConfiguration.uuid.toString());
+    bundle.putString(
+        DRM_LICENSE_URI_EXTRA + extrasKeySuffix,
+        drmConfiguration.licenseUri != null ? drmConfiguration.licenseUri.toString() : null);
+    bundle.putBoolean(DRM_MULTI_SESSION_EXTRA + extrasKeySuffix, drmConfiguration.multiSession);
+    bundle.putBoolean(
+        DRM_FORCE_DEFAULT_LICENSE_URI_EXTRA + extrasKeySuffix,
+        drmConfiguration.forceDefaultLicenseUri);
+
+    String[] drmKeyRequestProperties = new String[drmConfiguration.requestHeaders.size() * 2];
+    int index = 0;
+    for (Map.Entry<String, String> entry : drmConfiguration.requestHeaders.entrySet()) {
+      drmKeyRequestProperties[index++] = entry.getKey();
+      drmKeyRequestProperties[index++] = entry.getValue();
+    }
+    bundle.putStringArray(DRM_KEY_REQUEST_PROPERTIES_EXTRA + extrasKeySuffix,
+        drmKeyRequestProperties);
+
+    List<Integer> drmSessionForClearTypes = drmConfiguration.sessionForClearTypes;
+    if (!drmSessionForClearTypes.isEmpty()) {
+      // Only video and audio together are supported.
+      Assertions.checkState(
+          drmSessionForClearTypes.size() == 2
+              && drmSessionForClearTypes.contains(C.TRACK_TYPE_VIDEO)
+              && drmSessionForClearTypes.contains(C.TRACK_TYPE_AUDIO));
+      bundle.putBoolean(DRM_SESSION_FOR_CLEAR_CONTENT + extrasKeySuffix, true);
+    }
+  }
+
+
   private static void addClippingPropertiesToIntent(
       MediaItem.ClippingProperties clippingProperties, Intent intent, String extrasKeySuffix) {
     if (clippingProperties.startPositionMs != 0) {
@@ -226,6 +390,18 @@ public class IntentUtil {
     }
     if (clippingProperties.endPositionMs != C.TIME_END_OF_SOURCE) {
       intent.putExtra(
+          CLIP_END_POSITION_MS_EXTRA + extrasKeySuffix, clippingProperties.endPositionMs);
+    }
+  }
+
+  private static void addClippingPropertiesToBundle(
+      MediaItem.ClippingProperties clippingProperties, Bundle bundle, String extrasKeySuffix) {
+    if (clippingProperties.startPositionMs != 0) {
+      bundle.putLong(
+          CLIP_START_POSITION_MS_EXTRA + extrasKeySuffix, clippingProperties.startPositionMs);
+    }
+    if (clippingProperties.endPositionMs != C.TIME_END_OF_SOURCE) {
+      bundle.putLong(
           CLIP_END_POSITION_MS_EXTRA + extrasKeySuffix, clippingProperties.endPositionMs);
     }
   }

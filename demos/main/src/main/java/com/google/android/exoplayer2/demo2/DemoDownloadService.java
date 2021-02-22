@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.android.exoplayer2.demo;
+package com.google.android.exoplayer2.demo2;
 
-import static com.google.android.exoplayer2.demo.DemoUtil.DOWNLOAD_NOTIFICATION_CHANNEL_ID;
+import static com.google.android.exoplayer2.demo2.DemoUtil.DOWNLOAD_NOTIFICATION_CHANNEL_ID;
 
 import android.app.Notification;
 import android.content.Context;

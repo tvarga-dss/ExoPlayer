@@ -14,6 +14,6 @@
  * limitations under the License.
  */
 @NonNullApi
-package com.google.android.exoplayer2.demo;
+package com.google.android.exoplayer2.demo2;
 
 import com.google.android.exoplayer2.util.NonNullApi;

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.android.exoplayer2.demo;
+package com.google.android.exoplayer2.demo2;
 
 import static com.google.android.exoplayer2.util.Assertions.checkArgument;
 import static com.google.android.exoplayer2.util.Assertions.checkNotNull;
@@ -23,7 +23,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.content.res.AssetManager;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -227,7 +226,7 @@ public class SampleChooserActivity extends AppCompatActivity
     intent.putExtra(
         IntentUtil.PREFER_EXTENSION_DECODERS_EXTRA,
         isNonNullAndChecked(preferExtensionDecodersMenuItem));
-    IntentUtil.addToIntent(playlistHolder.mediaItems, intent);
+    IntentUtil.addToIntent(playlistHolder.mediaItems, intent, playlistHolder.title);
     startActivity(intent);
     return true;
   }

@@ -1,5 +1,28 @@
 [
   {
+    "name": "Multi player",
+    "samples": [
+      {
+        "name": "UHD (cbcs) -1",
+        "uri": "https://storage.googleapis.com/wvmedia/cbcs/h264/tears/tears_aes_cbcs_uhd.mpd",
+        "drm_scheme": "widevine",
+        "drm_license_uri": "https://proxy.uat.widevine.com/proxy?provider=widevine_test"
+      },
+      {
+        "name": "UHD (cbcs) -2",
+        "uri": "https://storage.googleapis.com/wvmedia/cbcs/h264/tears/tears_aes_cbcs_uhd.mpd",
+        "drm_scheme": "widevine",
+        "drm_license_uri": "https://proxy.uat.widevine.com/proxy?provider=widevine_test"
+      },
+      {
+        "name": "UHD (cbcs) -3",
+        "uri": "https://storage.googleapis.com/wvmedia/cbcs/h264/tears/tears_aes_cbcs_uhd.mpd",
+        "drm_scheme": "widevine",
+        "drm_license_uri": "https://proxy.uat.widevine.com/proxy?provider=widevine_test"
+      }
+    ]
+  },
+  {
     "name": "Clear DASH",
     "samples": [
       {
